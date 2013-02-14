@@ -31,7 +31,7 @@ def cbRequest(response, resCb):
     return finished
 
 def cbShutdown(ignored):
-    pass#reactor.stop()
+    reactor.stop()
 
 def resultHandler(res):
     #print res
@@ -52,10 +52,10 @@ def requestGet2(urls, callback):
         d.addCallback(cbRequest, callback)
         d.addBoth(cbShutdown)
     reactor.run()
-
+#http://technicae.cogitat.io/2008/06/async-batching-with-twisted-walkthrough.html
 #requestGet('http://web.student.chalmers.se/~matapp/', resultHandler)
 #requestGet('http://www.aftonbladet.se', resultHandler)
 #requestGet('http://www.expressen.se', resultHandler)
 
-requestGet2(['http://www.aftonbladet.se','http://www.expressen.se'], resultHandler)
+#requestGet2(['http://www.aftonbladet.se','http://www.expressen.se'], resultHandler)
 

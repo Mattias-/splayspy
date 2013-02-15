@@ -1,61 +1,25 @@
-from pprint import pformat
+from twisted.internet import defer, reactor
+from twisted.web.client import getPage
 
-from twisted.internet import reactor
-from twisted.internet.defer import Deferred
-from twisted.internet.protocol import Protocol
-from twisted.web.client import Agent
-from twisted.web.http_headers import Headers
+def getPageData(url, pageCallback):
+    d = getPage(url)
+    d.addCallback(pageCallback)
+    return d
 
-class BodyGetter(Protocol):
-    def __init__(self, finished):
-        self.finished = finished
-        self.data = []
+#def listCallback(result):
+#    for isSuccess, data in result:
+#        if isSuccess:
+#            print "Call to %s succeeded with data %s" % (data['url'], str(data))
 
-    def dataReceived(self, bytes):
-        self.data.append(str(bytes))
-
-    def connectionLost(self, reason):
-        #print 'Finished receiving body:', reason.getErrorMessage()
-        res = ''.join(self.data)
-        self.finished.callback(res)
-
-def cbRequest(response, resCb):
-    #print 'Response code:', response.code
-    #print 'Response phrase:', response.phrase
-    #print 'Response headers:'
-    #print pformat(list(response.headers.getAllRawHeaders()))
-
-    finished = Deferred()
-    finished.addCallback(resCb)
-    response.deliverBody(BodyGetter(finished))
-    return finished
-
-def cbShutdown(ignored):
+def finish(ign):
+    print 'finished'
     reactor.stop()
 
-def resultHandler(res):
-    #print res
-    print res[0:20]
-    pass
-
-def requestGet(url, callback):
-    agent = Agent(reactor)
-    d = agent.request('GET', url)
-    d.addCallback(cbRequest, callback)
-    d.addBoth(cbShutdown)
-    reactor.run()
-
-def requestGet2(urls, callback):
-    agent = Agent(reactor)
-    for u in urls:
-        d = agent.request('GET', u)
-        d.addCallback(cbRequest, callback)
-        d.addBoth(cbShutdown)
-    reactor.run()
-#http://technicae.cogitat.io/2008/06/async-batching-with-twisted-walkthrough.html
-#requestGet('http://web.student.chalmers.se/~matapp/', resultHandler)
-#requestGet('http://www.aftonbladet.se', resultHandler)
-#requestGet('http://www.expressen.se', resultHandler)
-
-#requestGet2(['http://www.aftonbladet.se','http://www.expressen.se'], resultHandler)
+def test(jobs):
+    defs = []
+    for url, pageCallback in jobs:
+        defs.append(getPageData(url, pageCallback))
+    dl = defer.DeferredList(defs)
+    #dl.addCallback(listCallback)
+    dl.addCallback(finish)
 

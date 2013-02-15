@@ -2,7 +2,7 @@ import time
 import urllib2
 
 import bs4
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 
 import gethttp
 import core
@@ -16,7 +16,8 @@ class SVTplay(core.Channel):
         self.base_url = 'http://www.svtplay.se'
         self.program_url = '%s/program' % self.base_url
 
-    def getSourcePrograms(self, raw, callback):
+    def getSourcePrograms(self, raw):
+        d = defer.Deferred()
         page = bs4.BeautifulSoup(raw)
         links = page.find_all('a', class_='playAlphabeticLetterLink')
 
@@ -30,11 +31,9 @@ class SVTplay(core.Channel):
             program = core.Program(id, name, url, channel)
             #print program
             source_prog_list.add(program)
-        callback(source_prog_list)
+        return source_prog_list
 
     def diffPrograms(self, source_prog_list):
-        #now = time.time()
-        #print time.time() - now
         if self.prog_list:
             a = self.prog_list.pop()
             a = self.prog_list.pop()
@@ -47,8 +46,11 @@ class SVTplay(core.Channel):
         # Make changes to database with new, removed
         self.prog_list = source_prog_list
 
-    def updatePrograms(self, raw):
-        self.getSourcePrograms(raw, self.diffPrograms)
+    def updatePrograms(self):
+        d = gethttp.getPageData(self.program_url)
+        d.addCallback(self.getSourcePrograms)
+        d.addCallback(self.diffPrograms)
+        return d
 
     def updateAll(self, raw):
         self.getSourceProrams(raw, self.diffPrograms)
@@ -56,11 +58,25 @@ class SVTplay(core.Channel):
 def th(res):
     print res[0:100], res[-10:]
 
-#gethttp.requestGet(url, programs)
-svt = SVTplay()
-gethttp.test([(svt.program_url, svt.updatePrograms),(svt.program_url, svt.updatePrograms)])
-reactor.run()
+def finish(ign):
+    print 'finished'
+    reactor.stop()
 
+def main():
+    start = time.time()
+    #print time.time() - now
+
+    svt = SVTplay()
+    defs = [svt.updatePrograms()]
+    dl = defer.DeferredList(defs)
+    dl.addBoth(finish)
+
+    reactor.run()
+
+main()
+
+
+#gethttp.requestGet(url, programs)
 #import urllib2
 #raw = urllib2.urlopen(url).read()
 #page = bs4.BeautifulSoup(raw)

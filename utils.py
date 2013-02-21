@@ -15,6 +15,7 @@ class SVTplay(core.Channel):
         self.prog_list = set()
         self.base_url = 'http://www.svtplay.se'
         self.program_url = '%s/program' % self.base_url
+        self.name = 'svtplay'
 
     def getSourcePrograms(self, raw):
         d = defer.Deferred()
@@ -27,8 +28,7 @@ class SVTplay(core.Channel):
             name = link.contents[0]
             url = "".join([self.base_url, link.get('href')])
             id = link.get('href')[1:]
-            channel ='svtplay'
-            program = core.Program(id, name, url, channel)
+            program = core.Program(id, name, url, self)
             #print program
             source_prog_list.add(program)
         return source_prog_list
@@ -37,14 +37,15 @@ class SVTplay(core.Channel):
         if self.prog_list:
             a = self.prog_list.pop()
             a = self.prog_list.pop()
-        print 'source_prog_list', len(source_prog_list)
-        print 'self.prog_list', len(self.prog_list)
+        #print 'source_prog_list', len(source_prog_list)
+        #print 'self.prog_list', len(self.prog_list)
         new = source_prog_list - self.prog_list
         removed = self.prog_list - source_prog_list
-        print '%s new %s' % (len(new), new)
-        print '%s removed %s' % (len(removed), removed)
+        #print '%s new %s' % (len(new), new)
+        #print '%s removed %s' % (len(removed), removed)
         # Make changes to database with new, removed
         self.prog_list = source_prog_list
+        return self.prog_list
 
     def updatePrograms(self):
         d = gethttp.getPageData(self.program_url)
@@ -52,8 +53,19 @@ class SVTplay(core.Channel):
         d.addCallback(self.diffPrograms)
         return d
 
-    def updateAll(self, raw):
-        self.getSourceProrams(raw, self.diffPrograms)
+    def updateProgramEpisodes(self, pl):
+        defs = []
+        if not pl:
+            print 'empty prog_list'
+        for p in pl:
+            print p
+            defs.append(p.updateEpisodes())
+        dl = defer.DeferredList(defs)
+        return dl
+
+    def getProgramEpisodes(self, program):
+        print "Getting episodes of: %s" % program.id
+        return ['e1','e2']
 
 def th(res):
     print res[0:100], res[-10:]
@@ -63,12 +75,17 @@ def finish(ign):
     reactor.stop()
 
 def main():
-    start = time.time()
+    #start = time.time()
     #print time.time() - now
 
     svt = SVTplay()
-    defs = [svt.updatePrograms()]
+    def1 = svt.updatePrograms()
+    #def2 = svt.updateProgramEpisodes()
+    def1.addCallback(svt.updateProgramEpisodes)
+    #def1.chainDeferred(svt.updateProgramEpisodes)
+    defs = [def1]#, def2]
     dl = defer.DeferredList(defs)
+
     dl.addBoth(finish)
 
     reactor.run()

@@ -1,8 +1,12 @@
-
+from twisted.internet import threads
 
 class Channel():
     def __init__(self):
         pass
+
+    def __repr__(self):
+        return "<Channel %s>" % self.name
+
     def findAddNewPrograms(self):
         pass
 
@@ -22,10 +26,20 @@ class Program():
     def __repr__(self):
         return "<Program %s @ %s>" % (self.id, self.channel)
 
-    def findAddNewEpisodes():
-        pass
-    def getEpisodes():
-        pass
+    def getSourceEpisodes(self, raw):
+        return 's'
+
+    def diffEpisodes(self, source):
+        return source, 'd'
+
+    def updateEpisodes(self):
+        print 'ssss'
+        #return 'd'
+        d = threads.deferToThread(self.channel.getProgramEpisodes, self)
+        #d = self.channel.getProgramEpisodes(self)
+        d.addCallback(self.getSourceEpisodes)
+        d.addCallback(self.diffEpisodes)
+        return d
 
 class Episode():
     def __init__():

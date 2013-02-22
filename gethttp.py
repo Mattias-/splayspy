@@ -1,23 +1,38 @@
 from twisted.internet import defer, reactor
 from twisted.web.client import getPage
+from twisted.internet.protocol import Protocol
+from twisted.web.client import Agent, HTTPConnectionPool
+from twisted.web import _newclient
+
 
 def getPageData(url):#, pageCallback):
     d = getPage(url)
-    #d.addCallback(pageCallback)
     return d
 
-#def listCallback(result):
-#    for isSuccess, data in result:
-#        if isSuccess:
-#            print "Call to %s succeeded with data %s" % (data['url'], str(data))
+class SimpleReceiver(Protocol):
+    def __init__(self, finished):
+        self.finished = finished
+        self.body = []
 
+    def dataReceived(self, bytes):
+        self.body.append(str(bytes))
 
-def test(jobs):
-    defs = []
-    for url, pageCallback in jobs:
-        defs.append(getPageData(url, pageCallback))
-    dl = defer.DeferredList(defs)
-    #dl.addCallback(listCallback)
-    dl.addCallback(finish)
-    return dl
+    def connectionLost(self, reason):
+        if reason.check(_newclient.ResponseDone):
+            self.finished.callback(''.join(self.body))
+        else:
+            self.finished.errback()
+
+def cbRequest(response):
+    finished = defer.Deferred()
+    response.deliverBody(SimpleReceiver(finished))
+    return finished
+
+pool = HTTPConnectionPool(reactor)
+agent = Agent(reactor, pool=pool)
+
+def requestGet(url):
+    d = agent.request('GET', url)
+    d.addCallback(cbRequest)
+    return d
 

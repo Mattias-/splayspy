@@ -26,18 +26,11 @@ class Program():
     def __repr__(self):
         return "<Program %s @ %s>" % (self.id, self.channel)
 
-    def getSourceEpisodes(self, raw):
-        return 's'
-
-    def diffEpisodes(self, source):
-        return source, 'd'
+    def diffEpisodes(self, episodes):
+        print self.id, episodes
 
     def updateEpisodes(self):
-        print 'ssss'
-        #return 'd'
-        d = threads.deferToThread(self.channel.getProgramEpisodes, self)
-        #d = self.channel.getProgramEpisodes(self)
-        d.addCallback(self.getSourceEpisodes)
+        d = self.channel.getProgramEpisodes(self)
         d.addCallback(self.diffEpisodes)
         return d
 

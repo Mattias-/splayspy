@@ -95,25 +95,19 @@ class SVTplay(core.Channel):
                 db_list = json.load(infile)
         except IOError as e:
             print 'no file %s' % filename
-        current = [d for d in db_list if not d.get('removed', False)]
-        removed = [d for d in db_list if d.get('removed', False)]
 
-        (add, remove, both) = core.diffDicts(episodes, current,
+        (new, old, current) = core.diffDicts(episodes, db_list,
                                              core.episodeHash)
-        (new, old_removed, readded) = core.diffDicts(add, removed,
-                                                     core.episodeHash)
+        now = datetime.datetime.utcnow().isoformat()
+        for d in new:
+            d['first_seen'] = d['last_seen'] = now
+            d['seen_counter'] = 1
+        for d in current:
+            d['last_seen'] = now
+            d['seen_counter'] = d.get('seen_counter', 1) + 1
+
         if new: print 'added', new
-        if remove: print 'removed', remove
-        if readded: print 'readded', readded
-        # add new items in db
-        # update 'removed'=True for remove items in db
-        # update 'removed'=False for readded items in db
-       
-        db_list = both+new
-        #set removed
-        for r in remove:
-            r['removed'] = True
-            db_list.append(r)
+        db_list = new+old+current
 
         with open(filename, 'w') as outfile:
             json.dump(db_list, outfile)
@@ -133,8 +127,6 @@ class SVTplay(core.Channel):
             data['length'] = e['data-length']
             data['img'] = e.find('img', class_='playGridThumbnail')['src'] 
             new_episode['data'] = data
-            new_episode['added'] = datetime.datetime.utcnow().isoformat()
-            new_episode['removed'] = False
             all_eps.append(new_episode)
             #print new_episode
         return all_eps

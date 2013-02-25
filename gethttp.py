@@ -21,6 +21,7 @@ class SimpleReceiver(Protocol):
         if reason.check(_newclient.ResponseDone):
             self.finished.callback(''.join(self.body))
         else:
+            print 'Error', reason
             self.finished.errback()
 
 def cbRequest(response):

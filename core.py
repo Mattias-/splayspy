@@ -10,30 +10,31 @@ class Channel():
     def findAddNewPrograms(self):
         pass
 
-class Program():
-    def __init__(self, id, name, url, channel):
-        self.id = id
-        self.name = name
-        self.url = url
-        self.channel = channel
+def diffDicts(d1, d2, hashfunc):
+    o_map = {}
+    for o in d1:
+        o_map[hashfunc(o)] = o
+    both = []
+    only_d2 = []
 
-    def __hash__(self):
-        return hash(self.id)+hash(self.name)+hash(self.channel)+hash(self.url)
+    for o in d2:
+        hashd = hashfunc(o)
+        if hashd in o_map:
+            both.append(o_map.pop(hashd))
+        else:
+            only_d2.append(o)
 
-    def __eq__(self, other):
-        return self.id == other.id and self.channel == other.channel
+    only_d1 = o_map.values()
+    return (only_d1, only_d2, both)
 
-    def __repr__(self):
-        return "<Program %s @ %s>" % (self.id, self.channel)
+def progHash(d):
+    hashkeys = ['id', 'name', 'url', 'channel']
+    return dictHashHelper(d, hashkeys)
 
-    def diffEpisodes(self, episodes):
-        print self.id, episodes
+def episodeHash(d):
+    hashkeys = ['name', 'url']
+    return dictHashHelper(d, hashkeys)
 
-    def updateEpisodes(self):
-        d = self.channel.getProgramEpisodes(self)
-        d.addCallback(self.diffEpisodes)
-        return d
-
-class Episode():
-    def __init__():
-        pass
+def dictHashHelper(d, hashkeys):
+    hashed_values = map(hash, [v for k,v in d.items() if k in hashkeys])
+    return sum(hashed_values)

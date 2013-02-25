@@ -1,164 +1,30 @@
-import time
-import urllib2
-import pickle
-import json
-import os
-import datetime
 
-import bs4
-from twisted.internet import reactor, defer
+def diffDicts(d1, d2, hashfunc):
+    o_map = {}
+    for o in d1:
+        o_map[hashfunc(o)] = o
+    both = []
+    only_d2 = []
 
-import gethttp
-import core
+    for o in d2:
+        hashd = hashfunc(o)
+        if hashd in o_map:
+            both.append(o_map.pop(hashd))
+        else:
+            only_d2.append(o)
 
-class SVTplay(core.Channel):
-    def __init__(self):
-        self.prog_list = []
-        self.base_url = 'http://www.svtplay.se'
-        self.all_programs_url = '%s/program' % self.base_url
-        self.program_url = '%s/%%s' % self.base_url
-        self.episodes_url = '%s?tab=episodes&sida=8'
-        self.name = 'svtplay'
+    only_d1 = o_map.values()
+    return (only_d1, only_d2, both)
 
-    def getSourcePrograms(self, raw):
-        d = defer.Deferred()
-        page = bs4.BeautifulSoup(raw)
-        links = page.find_all('a', class_='playAlphabeticLetterLink')
+def progHash(d):
+    hashkeys = ['id', 'name', 'url', 'channel']
+    return dictHashHelper(d, hashkeys)
 
-        source_prog_list = []
-        for link in links:
-            name = link.contents[0]
-            url = "".join([self.base_url, link.get('href')])
-            id = link.get('href')[1:]
-            program = {}
-            program['name'] = name
-            program['url'] = url
-            program['id'] = id
-            program['channel'] = self.name
-            source_prog_list.append(program)
-        return source_prog_list
+def episodeHash(d):
+    hashkeys = ['name', 'url']
+    return dictHashHelper(d, hashkeys)
 
-    def diffPrograms(self, source_prog_list):
-        db_list = []
-        # get programs from db
-        filename = 'db/%s.txt' % self.name
-        try:
-            with open(filename, 'r') as infile:
-                db_list = json.load(infile)
-        except IOError as e:
-            print 'no file %s' % filename
-            os.makedirs('db/%s_programs' % self.name)
-            print 'created program dir'
-
-        (new, removed, both) = core.diffDicts(source_prog_list, db_list,
-                                              core.progHash)
-        if new: print 'new', new
-        if removed: print 'removed', removed
-
-        # insert/update new
-        db_list.extend(new)
-        #set removed
-        for r in removed:
-            i = db_list.index(r)
-            db_list[i]['removed'] = True
-        with open(filename, 'w') as outfile:
-            json.dump(db_list, outfile)
-
-        print 'source_prog_list', len(source_prog_list)
-        return source_prog_list
-
-    def updatePrograms(self):
-        d = gethttp.getPageData(self.all_programs_url)
-        d.addCallback(self.getSourcePrograms)
-        d.addCallback(self.diffPrograms)
-        return d
-
-    def updateProgramEpisodes(self, pl):
-        defs = []
-        #pl = [pl.pop(), pl.pop()]
-        #print 'updating eps of', pl
-        for p in pl:
-            d = self.getProgramEpisodes(p)
-            d.addCallback(self.diffEpisodes, p)
-            defs.append(d)
-        dl = defer.DeferredList(defs)
-        return dl
-
-    def diffEpisodes(self, episodes, program):
-        print program['channel'], program['name'], len(episodes)
-        db_list = []
-
-        # get programs from db
-        filename = 'db/%s_programs/%s.txt' % (program['channel'], program['id'])
-        try:
-            with open(filename, 'r') as infile:
-                db_list = json.load(infile)
-        except IOError as e:
-            print 'no file %s' % filename
-
-        (new, old, current) = core.diffDicts(episodes, db_list,
-                                             core.episodeHash)
-        now = datetime.datetime.utcnow().isoformat()
-        for d in new:
-            d['first_seen'] = d['last_seen'] = now
-            d['seen_counter'] = 1
-        for d in current:
-            d['last_seen'] = now
-            d['seen_counter'] = d.get('seen_counter', 1) + 1
-
-        if new: print 'added', new
-        db_list = new+old+current
-
-        with open(filename, 'w') as outfile:
-            json.dump(db_list, outfile)
-
-    def getSourceEpisodes(self, raw):
-        page = bs4.BeautifulSoup(raw)
-        eps = page.find_all('article', class_='svtMediaBlock')
-        all_eps = []
-        for e in eps:
-            new_episode = {}
-            new_episode['name'] = e['data-title']
-            new_episode['url'] = "".join([self.base_url,
-                           e.find('a', class_='playLink')['href']])
-            data = {}
-            data['published'] = e.find('time')['datetime']
-            data['descr'] = e['data-description']
-            data['length'] = e['data-length']
-            data['img'] = e.find('img', class_='playGridThumbnail')['src'] 
-            new_episode['data'] = data
-            all_eps.append(new_episode)
-            #print new_episode
-        return all_eps
-
-    def getProgramEpisodes(self, program):
-        prog_url = self.program_url % str(program['id'])
-        url = self.episodes_url % prog_url
-        #TODO bench, tune persistentConn
-        d = gethttp.requestGet(url)
-        #d = gethttp.getPageData(url)
-        d.addCallback(self.getSourceEpisodes)
-        d.addErrback(self.printerror, program)
-        return d
-
-    def printerror(self, failure, program):
-        print failure, program
-
-def finish(ign):
-    print 'finished'
-    reactor.stop()
-
-def main():
-    svt = SVTplay()
-
-    d1 = svt.updatePrograms()
-    #d2 = svt.updatePrograms()
-    d1.addCallback(svt.updateProgramEpisodes)
-    defs = [d1]
-
-    dl = defer.DeferredList(defs)
-    dl.addBoth(finish)
-    reactor.run()
-
-main()
+def dictHashHelper(d, hashkeys):
+    hashed_values = map(hash, [v for k,v in d.items() if k in hashkeys])
+    return sum(hashed_values)
 

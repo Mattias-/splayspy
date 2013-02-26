@@ -33,17 +33,20 @@ class Channel():
             os.makedirs('db/%s_programs' % self.name)
             print 'created program dir'
 
-        (new, removed, both) = utils.diffDicts(source_prog_list, db_list,
-                                               utils.progHash)
-        if new: print 'new', new
-        if removed: print 'removed', removed
+        (new, old, current) = utils.diffDicts(source_prog_list, db_list,
+                                              utils.progHash)
+        if new: print 'added', new
 
-        # insert/update new
-        db_list.extend(new)
-        #set removed
-        for r in removed:
-            i = db_list.index(r)
-            db_list[i]['removed'] = True
+        now = datetime.datetime.utcnow().isoformat()
+        for d in new:
+            d['first_seen'] = d['last_seen'] = now
+            d['seen_counter'] = 1
+        for d in current:
+            d['last_seen'] = now
+            d['seen_counter'] = d.get('seen_counter', 1) + 1
+
+        db_list = new+old+current
+
         with open(filename, 'w') as outfile:
             json.dump(db_list, outfile)
 
@@ -100,8 +103,8 @@ class Channel():
         #TODO bench, tune persistentConn
         d = gethttp.requestGet(url)
         #d = gethttp.getPageData(url)
-        d.addCallback(self.getSourceEpisodes)
-        d.addErrback(self.printerror, program)
+        d.addCallbacks(self.getSourceEpisodes, self.printerror, errbackArgs=[program])
+        #d.addErrback(self.printerror, program)
         return d
 
     def printerror(self, failure, program):

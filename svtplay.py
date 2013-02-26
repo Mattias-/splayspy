@@ -1,5 +1,6 @@
 import bs4
 from twisted.internet import defer
+from rethinkdb import r
 
 import core
 
@@ -11,6 +12,9 @@ class SVTplay(core.Channel):
         self.program_url = '%s/%%s' % self.base_url
         self.episodes_url = '%s/%%s/?tab=episodes&sida=8' % self.base_url
         self.name = 'svtplay'
+        r.connect('localhost', 28015)
+        self.db_table = r.db('dev').table('programs')
+        super(core.Channel, self).__init__()
 
     def getSourcePrograms(self, raw):
         d = defer.Deferred()

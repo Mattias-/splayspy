@@ -4,13 +4,15 @@ import os
 import datetime
 
 from twisted.internet import defer
+from rethinkdb import r
 
 import gethttp
 import utils
 
-class Channel():
+class Channel(object):
     def __init__(self):
-        pass
+        r.connect('localhost', 28015)
+        self.db_table = r.db('dev').table('programs')
 
     def __repr__(self):
         return "<Channel %s>" % self.name
@@ -22,6 +24,31 @@ class Channel():
         pass
 
     def diffPrograms(self, source_prog_list):
+        t = self.db_table
+
+        #filter svtplay
+        db_list = t.without('episodes').run()
+
+        (new, old, current) = utils.diffDicts(source_prog_list, db_list,
+                                              utils.progHash)
+        if new: print 'added', new
+
+        now = datetime.datetime.utcnow().isoformat()
+        for d in new:
+            d['first_seen'] = d['last_seen'] = now
+            d['seen_counter'] = 1
+            d['episodes'] = []
+        t.insert(new).run()
+
+        for d in current:
+            t.filter({'channel':d['channel'], 'id':d['id']}).update({
+                'seen_counter': r.row['seen_counter'] + 1,
+                'last_seen': now}).run()
+
+        print 'source_prog_list', len(source_prog_list)
+        return source_prog_list
+
+    def diffPrograms2(self, source_prog_list):
         db_list = []
         # get programs from db
         filename = 'db/%s.txt' % self.name
@@ -71,6 +98,36 @@ class Channel():
         return dl
 
     def diffEpisodes(self, episodes, program):
+        print program['channel'], program['name'], len(episodes)
+
+        t = self.db_table
+        db_program = t.filter({'channel':program['channel'],
+                               'id': program['id']})
+
+        db_res = db_program.pluck('episodes').run()
+        for d in db_res:
+            db_list = d['episodes']
+        #if len(db_res) == 1:
+        #    db_list = db_res[0]
+        #else:
+        #    raise Exception('too many results')
+
+        #(new, old, current) = utils.diffDicts(episodes, db_list,
+        (old, new, current) = utils.diffDicts(db_list, episodes,
+                                              utils.episodeHash)
+        now = datetime.datetime.utcnow().isoformat()
+        for d in new:
+            d['first_seen'] = d['last_seen'] = now
+            d['seen_counter'] = 1
+        for d in current:
+            d['last_seen'] = now
+            d['seen_counter'] += 1
+
+        if new: print 'added', new
+
+        db_program.update({'episodes': new+old+current}).run()
+
+    def diffEpisodes2(self, episodes, program):
         print program['channel'], program['name'], len(episodes)
         db_list = []
 

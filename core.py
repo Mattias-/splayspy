@@ -3,7 +3,7 @@ import json
 import os
 import datetime
 
-from twisted.internet import defer
+from twisted.internet import defer, task
 from rethinkdb import r
 
 import gethttp
@@ -87,12 +87,19 @@ class Channel(object):
         return d
 
     def updateProgramEpisodes(self, pl):
+        print "Start getting the episodes"
+        def defGen(pl):
+            #pl = [pl.pop(), pl.pop()]
+            for p in pl:
+                d = self.getProgramEpisodes(p)
+                d.addCallback(self.diffEpisodes, p)
+                yield d
         defs = []
-        #pl = [pl.pop(), pl.pop()]
-        #print 'updating eps of', pl
-        for p in pl:
-            d = self.getProgramEpisodes(p)
-            d.addCallback(self.diffEpisodes, p)
+        coop = task.Cooperator()
+        work = defGen(pl)
+        maxRun = 5
+        for i in xrange(maxRun):
+            d = coop.coiterate(work)
             defs.append(d)
         dl = defer.DeferredList(defs)
         return dl

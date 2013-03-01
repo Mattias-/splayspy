@@ -29,7 +29,7 @@ def cbRequest(response):
     response.deliverBody(SimpleReceiver(finished))
     return finished
 
-pool = HTTPConnectionPool(reactor)
+pool = HTTPConnectionPool(reactor, persistent=True)
 agent = Agent(reactor, pool=pool)
 
 def requestGet(url):

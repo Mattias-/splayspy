@@ -6,49 +6,43 @@ import core
 
 class SVTplay(core.Channel):
     def __init__(self):
-        self.prog_list = []
+        self.name = 'svtplay'
         self.base_url = 'http://www.svtplay.se'
         self.all_programs_url = '%s/program' % self.base_url
         self.program_url = '%s/%%s' % self.base_url
         self.episodes_url = '%s/%%s/?tab=episodes&sida=8' % self.base_url
-        self.name = 'svtplay'
+
         r.connect('localhost', 28015)
         self.db_table = r.db('dev').table('programs')
         super(core.Channel, self).__init__()
 
     def getSourcePrograms(self, raw):
-        d = defer.Deferred()
         page = bs4.BeautifulSoup(raw)
-        links = page.find_all('a', class_='playAlphabeticLetterLink')
-
-        source_prog_list = []
-        for link in links:
-            name = link.contents[0]
-            url = "".join([self.base_url, link.get('href')])
-            id = link.get('href')[1:]
+        nodes = page.find_all('a', class_='playAlphabeticLetterLink')
+        progs = []
+        for n in nodes:
             program = {}
-            program['name'] = name
-            program['url'] = url
-            program['id'] = id
             program['channel'] = self.name
-            source_prog_list.append(program)
-        return source_prog_list
+            program['id'] = n.get('href')[1:]
+            program['name'] = n.contents[0]
+            program['url'] = "".join([self.base_url, n.get('href')])
+            progs.append(program)
+        return progs
 
     def getSourceEpisodes(self, raw):
         page = bs4.BeautifulSoup(raw)
-        eps = page.find_all('article', class_='svtMediaBlock')
-        all_eps = []
-        for e in eps:
-            new_episode = {}
-            new_episode['name'] = e['data-title']
-            new_episode['url'] = "".join([self.base_url,
-                           e.find('a', class_='playLink')['href']])
+        nodes = page.find_all('article', class_='svtMediaBlock')
+        eps = []
+        for n in nodes:
+            episode = {}
+            episode['name'] = n['data-title']
+            episode['url'] = "".join([self.base_url,
+                                      n.find('a', class_='playLink')['href']])
             data = {}
-            data['published'] = e.find('time')['datetime']
-            data['descr'] = e['data-description']
-            data['length'] = e['data-length']
-            data['img'] = e.find('img', class_='playGridThumbnail')['src'] 
-            new_episode['data'] = data
-            all_eps.append(new_episode)
-            #print new_episode
-        return all_eps
+            data['published'] = n.find('time')['datetime']
+            data['descr'] = n['data-description']
+            data['length'] = n['data-length']
+            data['img'] = n.find('img', class_='playGridThumbnail')['src']
+            episode['data'] = data
+            eps.append(episode)
+        return eps

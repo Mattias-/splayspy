@@ -1,22 +1,40 @@
 
+import logging
+
 from twisted.internet import reactor, defer
 
 import svtplay
 
+log = logging.getLogger("splays")
+
 def finish(ign):
-    print 'finished'
+    log.info("Finished!")
     reactor.stop()
 
 def main():
+    log.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s::%(name)s::%(levelname)s::%(message)s')
+    fh = logging.FileHandler("splays.log", mode='w')
+    fh.setFormatter(formatter)
+    sh = logging.StreamHandler()
+    sh.setFormatter(formatter)
+    log.addHandler(fh)
+    log.addHandler(sh)
+
+    log.info("Started splays scraper & parser")
+
     svt = svtplay.SVTplay()
+    channels = [svt]
+    log.info("Channels: %s" % channels)
 
-    d1 = svt.updatePrograms()
-    #d2 = svt.updatePrograms()
-    d1.addCallback(svt.updateProgramEpisodes)
-    defs = [d1]
-
+    defs = []
+    for ch in channels:
+        d = ch.updatePrograms()
+        d.addCallback(ch.updateProgramEpisodes)
+        defs.append(d)
     dl = defer.DeferredList(defs)
     dl.addBoth(finish)
+
     reactor.run()
 
 main()

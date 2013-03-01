@@ -2,12 +2,15 @@ import time
 import json
 import os
 import datetime
+import logging
 
 from twisted.internet import defer, task
 from rethinkdb import r
 
 import gethttp
 import utils
+
+log = logging.getLogger("splays.core")
 
 class Channel(object):
     def __init__(self):
@@ -26,13 +29,19 @@ class Channel(object):
     def diffPrograms(self, source_prog_list):
         t = self.db_table
 
-        #filter svtplay
+        #TODO filter svtplay
         db_list = t.without('episodes').run()
 
         (new, old, current) = utils.diffDicts(source_prog_list, db_list,
                                               utils.progHash)
-        if new: print 'added', new
+        if new:
+            log.info('Added new %s programs: %s' % (self.name,
+                                                    [n['name'] for n in new]))
+            log.debug(new)
 
+        if old:
+            log.debug('Missing (old) %s programs: %s' % (self.name,
+                                                         [o['id'] for o in old]))
         now = datetime.datetime.utcnow().isoformat()
         for d in new:
             d['first_seen'] = d['last_seen'] = now
@@ -45,7 +54,6 @@ class Channel(object):
                 'seen_counter': r.row['seen_counter'] + 1,
                 'last_seen': now}).run()
 
-        print 'source_prog_list', len(source_prog_list)
         return source_prog_list
 
     def updatePrograms(self):
@@ -55,7 +63,6 @@ class Channel(object):
         return d
 
     def updateProgramEpisodes(self, pl):
-        print "Start getting the episodes"
         def defGen(pl):
             #pl = [pl.pop(), pl.pop()]
             for p in pl:
@@ -73,7 +80,9 @@ class Channel(object):
         return dl
 
     def diffEpisodes(self, episodes, program):
-        print program['channel'], program['name'], len(episodes)
+        log.info('Diffing episodes of %s %s, count: %d' % (program['channel'],
+                                                          program['name'],
+                                                          len(episodes)))
 
         t = self.db_table
         db_program = t.filter({'channel':program['channel'],
@@ -97,7 +106,9 @@ class Channel(object):
             d['last_seen'] = now
             d['seen_counter'] += 1
 
-        if new: print 'added', new
+        if new:
+            log.info('Added episodes to %s %s: %s' % (self.name, program['id'],
+                                                    [n['name'] for n in new]))
 
         db_program.update({'episodes': new+old+current}).run()
 

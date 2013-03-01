@@ -1,10 +1,8 @@
-import time
-import json
-import os
 import datetime
 import logging
 
 from twisted.internet import defer, task
+import twisted.web.client as web_client
 from rethinkdb import r
 
 import gethttp
@@ -29,8 +27,7 @@ class Channel(object):
     def diffPrograms(self, source_prog_list):
         t = self.db_table
 
-        #TODO filter svtplay
-        db_list = t.without('episodes').run()
+        db_list = t.filter({'channel':self.name}).without('episodes').run()
 
         (new, old, current) = utils.diffDicts(source_prog_list, db_list,
                                               utils.progHash)
@@ -57,7 +54,7 @@ class Channel(object):
         return source_prog_list
 
     def updatePrograms(self):
-        d = gethttp.getPageData(self.all_programs_url)
+        d = web_client.getPage(self.all_programs_url)
         d.addCallback(self.getSourcePrograms)
         d.addCallback(self.diffPrograms)
         return d

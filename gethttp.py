@@ -1,6 +1,7 @@
 from twisted.internet import defer, reactor, protocol
 import twisted.web.client as web_client
 import twisted.web._newclient as new_web_client
+import twisted.web.http_headers as http_headers
 
 def cbRequest(response):
     class SimpleReceiver(protocol.Protocol):
@@ -23,9 +24,12 @@ def cbRequest(response):
 
 pool = web_client.HTTPConnectionPool(reactor, persistent=True)
 agent = web_client.Agent(reactor, pool=pool)
-
+user_agent = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_2) '
+             'AppleWebKit/537.17 (KHTML, like Gecko) '
+             'Chrome/24.0.1312.56 Safari/537.17')
+headers = http_headers.Headers({'User-Agent':[user_agent]})
 def requestGet(url):
-    d = agent.request('GET', url)
+    d = agent.request('GET', url, headers)
     d.addCallback(cbRequest)
     return d
 

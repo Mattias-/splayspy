@@ -1,4 +1,5 @@
 import datetime
+import time
 import logging
 
 from twisted.internet import defer, task
@@ -80,34 +81,39 @@ class Channel(object):
         log.info('Diffing episodes of %s %s, count: %d' % (program['channel'],
                                                           program['name'],
                                                           len(episodes)))
+        starttime = time.time()
+        if episodes:
+            t = self.db_table
+            db_program = t.filter({'channel':program['channel'],
+                                   'id': program['id']})
 
-        t = self.db_table
-        db_program = t.filter({'channel':program['channel'],
-                               'id': program['id']})
+            db_res = db_program.pluck('episodes').run()
+            for d in db_res:
+                db_list = d['episodes']
+            #if len(db_res) == 1:
+            #    db_list = db_res[0]
+            #else:
+            #    raise Exception('too many results')
 
-        db_res = db_program.pluck('episodes').run()
-        for d in db_res:
-            db_list = d['episodes']
-        #if len(db_res) == 1:
-        #    db_list = db_res[0]
-        #else:
-        #    raise Exception('too many results')
+            (old, new, current) = utils.diffDicts(db_list, episodes,
+                                                  utils.episodeHash)
+            now = datetime.datetime.utcnow().isoformat()
+            for d in new:
+                d['first_seen'] = d['last_seen'] = now
+                d['seen_counter'] = 1
+            for d in current:
+                d['last_seen'] = now
+                d['seen_counter'] += 1
 
-        (old, new, current) = utils.diffDicts(db_list, episodes,
-                                              utils.episodeHash)
-        now = datetime.datetime.utcnow().isoformat()
-        for d in new:
-            d['first_seen'] = d['last_seen'] = now
-            d['seen_counter'] = 1
-        for d in current:
-            d['last_seen'] = now
-            d['seen_counter'] += 1
+            if new:
+                log.info('Added episodes to %s %s: %s' % (self.name, program['id'],
+                                                        [n['name'] for n in new]))
 
-        if new:
-            log.info('Added episodes to %s %s: %s' % (self.name, program['id'],
-                                                    [n['name'] for n in new]))
-
-        db_program.update({'episodes': new+old+current}).run()
+            db_program.update({'episodes': new+old+current}).run()
+        totaltime = time.time() - starttime
+        log.debug('Diffing episodes of %s %s, time: %s' % (program['channel'],
+                                                           program['name'],
+                                                           totaltime))
 
     def getProgramEpisodes(self, program):
         url = self.episodes_url % str(program['id'])

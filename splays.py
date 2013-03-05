@@ -4,6 +4,7 @@ import logging
 from twisted.internet import reactor, defer
 
 import svtplay
+import tv4play
 
 log = logging.getLogger("splays")
 
@@ -24,16 +25,22 @@ def main():
     log.info("Started splays scraper & parser")
 
     svt = svtplay.SVTplay()
-    channels = [svt]
+    tv4 = tv4play.TV4play()
+    channels = [\
+                svt,
+  #              tv4,
+                ]
     log.info("Channels: %s" % channels)
 
     defs = []
+    d = defer.Deferred()
     for ch in channels:
-        d = ch.updatePrograms()
-        d.addCallback(ch.updateProgramEpisodes)
-        defs.append(d)
-    dl = defer.DeferredList(defs)
-    dl.addBoth(finish)
+        tmp = ch.updatePrograms()
+        #tmp.addCallback(ch.updateProgramEpisodes)
+        d.chainDeferred(tmp)
+        d = tmp
+    #dl = defer.DeferredList(defs)
+    d.addBoth(finish)
 
     reactor.run()
 

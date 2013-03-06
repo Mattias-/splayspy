@@ -1,16 +1,9 @@
-
 import logging
-
-from twisted.internet import reactor, defer
 
 import svtplay
 import tv4play
 
 log = logging.getLogger("splays")
-
-def finish(ign):
-    log.info("Finished!")
-    reactor.stop()
 
 def main():
     log.setLevel(logging.DEBUG)
@@ -32,16 +25,8 @@ def main():
                 ]
     log.info("Channels: %s" % channels)
 
-    defs = []
-    d = defer.Deferred()
-    for ch in channels:
-        tmp = ch.updatePrograms()
-        #tmp.addCallback(ch.updateProgramEpisodes)
-        d.chainDeferred(tmp)
-        d = tmp
-    #dl = defer.DeferredList(defs)
-    d.addBoth(finish)
-
-    reactor.run()
+    for c in channels:
+        pl = c.updatePrograms()
+        c.updateProgramEpisodes(pl)
 
 main()

@@ -34,7 +34,6 @@ class Channel(object):
         #pl = [pl.pop(), pl.pop()]
         errors = []
         for p in pl:
-            print p
             url = self.episodes_url % str(p['id'])
             try:
                 f = urllib2.urlopen(url)
@@ -83,6 +82,7 @@ class Channel(object):
                                                            totaltime))
 
     def diffPrograms(self, source_prog_list):
+        starttime = time.time()
         t = self.db_table
 
         db_list = t.filter({'channel':self.name}).without('episodes').run()
@@ -104,10 +104,13 @@ class Channel(object):
             d['episodes'] = []
         t.insert(new).run()
 
-        for d in current:
-            t.filter({'channel':d['channel'], 'id':d['id']}).update({
+        li = [str(p['id']) for p in current]
+        js_str = "this.channel == '%s' && %s.indexOf(this.id) >= 0" % (self.name, li)
+        t.filter(r.js(js_str)).update({
                 'seen_counter': r.row['seen_counter'] + 1,
                 'last_seen': now}).run()
 
+        totaltime = time.time() - starttime
+        log.debug('Diffing programs of %s, time: %s' % (self.name, totaltime))
         return source_prog_list
 

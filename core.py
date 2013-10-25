@@ -3,16 +3,15 @@ import time
 import logging
 import urllib2
 
-from rethinkdb import r
-
+import fs_storage as storage
 import utils
 
 log = logging.getLogger("splays.core")
 
+
 class Channel(object):
     def __init__(self):
-        r.connect('localhost', 28015)
-        self.db_table = r.db('dev').table('programs')
+        pass
 
     def __repr__(self):
         return "<Channel %s>" % self.name
@@ -23,11 +22,12 @@ class Channel(object):
     def getSourceEpisodes(self, raw):
         pass
 
-    def updatePrograms(self):
+    def getPrograms(self):
         f = urllib2.urlopen(self.all_programs_url)
         programs = self.getSourcePrograms(f)
         #programs = [programs.pop(), programs.pop()]
-        self.diffPrograms(programs)
+        log.debug("Got %d programs" % len(programs))
+        self.updatePrograms(programs)
         return programs
 
     def updateProgramEpisodes(self, pl):
@@ -44,16 +44,17 @@ class Channel(object):
                 errors.append(p)
 
     def diffEpisodes(self, episodes, program):
+        pass
         log.info('Diffing episodes of %s %s, count: %d' % (program['channel'],
-                                                          program['name'],
-                                                          len(episodes)))
+                                                           program['name'],
+                                                           len(episodes)))
         starttime = time.time()
         if episodes:
-            t = self.db_table
-            db_program = t.filter({'channel':program['channel'],
-                                   'id': program['id']})
+            #t = self.db_table
+            #db_program = t.filter({'channel':program['channel'],
+            #                       'id': program['id']})
 
-            db_res = db_program.pluck('episodes').run()
+            #db_res = db_program.pluck('episodes').run()
             for d in db_res:
                 db_list = d['episodes']
             #if len(db_res) == 1:
@@ -72,8 +73,9 @@ class Channel(object):
                 d['seen_counter'] += 1
 
             if new:
-                log.info('Added episodes to %s %s: %s' % (self.name, program['id'],
-                                                        [n['name'] for n in new]))
+                log.info('Added episodes to %s %s: %s' % (self.name,
+                                                          program['id'],
+                                                          [n['name'] for n in new]))
 
             db_program.update({'episodes': new+old+current}).run()
         totaltime = time.time() - starttime
@@ -81,36 +83,28 @@ class Channel(object):
                                                            program['name'],
                                                            totaltime))
 
-    def diffPrograms(self, source_prog_list):
+    def updatePrograms(self, source_prog_list):
         starttime = time.time()
-        t = self.db_table
-
-        db_list = t.filter({'channel':self.name}).without('episodes').run()
-
+        db_list = storage.get_programs(self)
         (new, old, current) = utils.diffDicts(source_prog_list, db_list,
-                                              utils.progHash)
+                                              utils.progHash, both_ref=db_list)
         if new:
             log.info('Added new %s programs: %s' % (self.name,
                                                     [n['name'] for n in new]))
             log.debug(new)
-
         if old:
             log.debug('Missing (old) %s programs: %s' % (self.name,
                                                          [o['id'] for o in old]))
         now = datetime.datetime.utcnow().isoformat()
         for d in new:
-            d['first_seen'] = d['last_seen'] = now
-            d['seen_counter'] = 1
             d['episodes'] = []
-        t.insert(new).run()
+            d['seen'] = [now]
 
-        li = [str(p['id']) for p in current]
-        js_str = "this.channel == '%s' && %s.indexOf(this.id) >= 0" % (self.name, li)
-        t.filter(r.js(js_str)).update({
-                'seen_counter': r.row['seen_counter'] + 1,
-                'last_seen': now}).run()
+        for program in current:
+            program['seen'] += [now]
+
+        storage.save_programs(self, new+old+current)
 
         totaltime = time.time() - starttime
         log.debug('Diffing programs of %s, time: %s' % (self.name, totaltime))
         return source_prog_list
-

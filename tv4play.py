@@ -1,8 +1,7 @@
 import bs4
-from twisted.internet import defer
-from rethinkdb import r
 
 import core
+
 
 class TV4play(core.Channel):
     def __init__(self):
@@ -11,9 +10,6 @@ class TV4play(core.Channel):
         self.all_programs_url = '%s/program?content-type=a-o' % self.base_url
         self.program_url = '%s/program/%%s' % self.base_url
         self.episodes_url = '%s/videos/search?node_nids=%%s&page=1&per_page=999&type=video' % self.base_url
-
-        r.connect('localhost', 28015)
-        self.db_table = r.db('dev').table('programs')
         super(core.Channel, self).__init__()
 
     def getSourcePrograms(self, raw):

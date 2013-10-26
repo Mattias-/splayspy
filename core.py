@@ -26,7 +26,7 @@ class Channel(object):
         f = urllib2.urlopen(self.all_programs_url)
         programs = self.getSourcePrograms(f)
         #programs = [programs.pop(), programs.pop()]
-        log.debug("Got %d programs" % len(programs))
+        log.debug("Got %d programs from %s" % (len(programs), self.name))
         self.updatePrograms(programs)
         return programs
 
@@ -89,17 +89,18 @@ class Channel(object):
         (new, old, current) = utils.diffDicts(source_prog_list, db_list,
                                               utils.progHash, both_ref=db_list)
         if new:
-            log.info('Added new %s programs: %s' % (self.name,
-                                                    [n['name'] for n in new]))
-            log.debug(new)
+            log.info('Added %d new %s programs' % (len(new), self.name))
+            log.debug('New %s programs: %s' % (self.name, [n['id'] for n in new]))
         if old:
-            log.debug('Missing (old) %s programs: %s' % (self.name,
-                                                         [o['id'] for o in old]))
+            log.info('Missing %d old %s programs' % (len(old), self.name))
+            log.debug('Old %s programs: %s' % (self.name, [o['id'] for o in old]))
+        if len(new) == 0 and len(old) == 0:
+            log.info('%s exact match, no new, no old.' % self.name)
+
         now = datetime.datetime.utcnow().isoformat()
         for d in new:
             d['episodes'] = []
             d['seen'] = [now]
-
         for program in current:
             program['seen'] += [now]
 

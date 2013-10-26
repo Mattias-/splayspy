@@ -81,24 +81,23 @@ class Channel(object):
     def updatePrograms(self, source_prog_list):
         starttime = time.time()
         db_list = storage.get_programs(self)
-        (new, old, current) = utils.diffDicts(source_prog_list, db_list,
-                                              utils.progHash, both_ref=db_list)
+        (old, new, current) = utils.diffDicts(db_list, source_prog_list,
+                                              utils.progHash)
         if new:
             log.info('Added %d new %s programs' % (len(new), self.name))
-            log.debug('New %s programs: %s' % (self.name, [n['id'] for n in new]))
+            log.debug('New %s programs: %s' % (self.name, [p['id'] for p in new]))
         if old:
             log.info('Missing %d old %s programs' % (len(old), self.name))
-            log.debug('Old %s programs: %s' % (self.name, [o['id'] for o in old]))
+            log.debug('Old %s programs: %s' % (self.name, [p['id'] for p in old]))
         if len(new) == 0 and len(old) == 0:
             log.info('%s exact match, no new, no old.' % self.name)
 
         now = datetime.datetime.utcnow().isoformat()
-        for d in new:
-            d['episodes'] = []
-            d['seen'] = [now]
+        for program in new:
+            program['episodes'] = []
+            program['seen'] = [now]
         for program in current:
-            program['seen'] += [now]
-
+            program['seen'].append(now)
         storage.save_programs(self, new+old+current)
 
         totaltime = time.time() - starttime

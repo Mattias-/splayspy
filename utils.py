@@ -15,6 +15,7 @@ def diffDicts(d1, d2, hashfunc, both_ref=None):
         if hashd in o_map:
             if both_ref is d2:
                 both.append(o)
+                o_map.pop(hashd)
             else:
                 both.append(o_map.pop(hashd))
         else:

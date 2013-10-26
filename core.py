@@ -31,6 +31,7 @@ class Channel(object):
         return programs
 
     def getEpisodes(self, pl):
+        starttime = time.time()
         errors = []
         for p in pl:
             url = self.episodes_url % str(p['id'])
@@ -39,8 +40,11 @@ class Channel(object):
                 episodes = self.getSourceEpisodes(f)
                 self.updateEpisodes(p, episodes)
             except urllib2.HTTPError as e:
-                log.error("Program %s, %s" % (p,e))
+                log.error("Program %s, %s" % (p, e))
                 errors.append(p)
+        totaltime = time.time() - starttime
+        log.info('Got all episodes of %s programs in %s' %
+                 (self.name, totaltime))
 
     def updateEpisodes(self, program, episodes):
         starttime = time.time()
@@ -49,22 +53,20 @@ class Channel(object):
             (old, new, current) = utils.diffDicts(db_list, episodes,
                                                   utils.episodeHash)
             if new:
-                log.info('Added %d new episodes to %s %s' % (len(new),
-                                                             program['channel'],
-                                                             program['name']))
-                log.debug('New %s %s episodes: %s' % (program['channel'],
-                                                      program['name'],
-                                                      [e['name'] for e in new]))
+                log.info('Added %d new episodes to %s %s' %
+                         (len(new), program['channel'], program['name']))
+                log.debug('New %s %s episodes: %s' %
+                          (program['channel'], program['name'],
+                           [e['name'] for e in new]))
             if old:
-                log.info('Missing %d old episodes from %s %s' % (len(old),
-                                                                 program['channel'],
-                                                                 program['name']))
-                log.debug('Missing %s %s episodes: %s' % (program['channel'],
-                                                          program['name'],
-                                                          [e['name'] for e in old]))
+                log.info('Missing %d old episodes from %s %s' %
+                         (len(old), program['channel'], program['name']))
+                log.debug('Missing %s %s episodes: %s' %
+                          (program['channel'], program['name'],
+                           [e['name'] for e in old]))
             if len(new) == 0 and len(old) == 0:
-                log.info('%s %s exact match, no new, no old.' % (program['channel'],
-                                                                 program['name']))
+                log.info('%s %s exact match, no new, no old.' %
+                         (program['channel'], program['name']))
 
             now = datetime.datetime.utcnow().isoformat()
             for episode in new:
@@ -85,10 +87,12 @@ class Channel(object):
                                               utils.progHash)
         if new:
             log.info('Added %d new %s programs' % (len(new), self.name))
-            log.debug('New %s programs: %s' % (self.name, [p['id'] for p in new]))
+            log.debug('New %s programs: %s' % (self.name,
+                                               [p['id'] for p in new]))
         if old:
             log.info('Missing %d old %s programs' % (len(old), self.name))
-            log.debug('Old %s programs: %s' % (self.name, [p['id'] for p in old]))
+            log.debug('Old %s programs: %s' % (self.name,
+                                               [p['id'] for p in old]))
         if len(new) == 0 and len(old) == 0:
             log.info('%s exact match, no new, no old.' % self.name)
 
@@ -102,4 +106,3 @@ class Channel(object):
 
         totaltime = time.time() - starttime
         log.debug('Diffing programs of %s, time: %s' % (self.name, totaltime))
-        return source_prog_list

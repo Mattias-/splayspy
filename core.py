@@ -30,54 +30,49 @@ class Channel(object):
         self.updatePrograms(programs)
         return programs
 
-    def updateProgramEpisodes(self, pl):
-        #pl = [pl.pop(), pl.pop()]
+    def getEpisodes(self, pl):
         errors = []
         for p in pl:
             url = self.episodes_url % str(p['id'])
             try:
                 f = urllib2.urlopen(url)
                 episodes = self.getSourceEpisodes(f)
-                self.diffEpisodes(episodes, p)
+                self.updateEpisodes(p, episodes)
             except urllib2.HTTPError as e:
                 log.error("Program %s, %s" % (p,e))
                 errors.append(p)
 
-    def diffEpisodes(self, episodes, program):
-        pass
-        log.info('Diffing episodes of %s %s, count: %d' % (program['channel'],
-                                                           program['name'],
-                                                           len(episodes)))
+    def updateEpisodes(self, program, episodes):
         starttime = time.time()
         if episodes:
-            #t = self.db_table
-            #db_program = t.filter({'channel':program['channel'],
-            #                       'id': program['id']})
-
-            #db_res = db_program.pluck('episodes').run()
-            for d in db_res:
-                db_list = d['episodes']
-            #if len(db_res) == 1:
-            #    db_list = db_res[0]
-            #else:
-            #    raise Exception('too many results')
-
+            db_list = storage.get_episodes(program)
             (old, new, current) = utils.diffDicts(db_list, episodes,
                                                   utils.episodeHash)
-            now = datetime.datetime.utcnow().isoformat()
-            for d in new:
-                d['first_seen'] = d['last_seen'] = now
-                d['seen_counter'] = 1
-            for d in current:
-                d['last_seen'] = now
-                d['seen_counter'] += 1
-
             if new:
-                log.info('Added episodes to %s %s: %s' % (self.name,
-                                                          program['id'],
-                                                          [n['name'] for n in new]))
+                log.info('Added %d new episodes to %s %s' % (len(new),
+                                                             program['channel'],
+                                                             program['name']))
+                log.debug('New %s %s episodes: %s' % (program['channel'],
+                                                      program['name'],
+                                                      [e['name'] for e in new]))
+            if old:
+                log.info('Missing %d old episodes from %s %s' % (len(old),
+                                                                 program['channel'],
+                                                                 program['name']))
+                log.debug('Missing %s %s episodes: %s' % (program['channel'],
+                                                          program['name'],
+                                                          [e['name'] for e in old]))
+            if len(new) == 0 and len(old) == 0:
+                log.info('%s %s exact match, no new, no old.' % (program['channel'],
+                                                                 program['name']))
 
-            db_program.update({'episodes': new+old+current}).run()
+            now = datetime.datetime.utcnow().isoformat()
+            for episode in new:
+                episode['seen'] = [now]
+            for episode in current:
+                episode['seen'].append(now)
+            storage.save_episodes(program, new+old+current)
+
         totaltime = time.time() - starttime
         log.debug('Diffing episodes of %s %s, time: %s' % (program['channel'],
                                                            program['name'],

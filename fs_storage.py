@@ -20,7 +20,7 @@ def save_programs(channel, prog_list):
         json.dump(prog_list, outfile)
 
 
-def get_episodes(channel, program):
+def get_episodes(program):
     db_list = []
     dirname = 'db/%s_programs' % program['channel']
     filename = '%s/%s.txt' % (dirname, program['id'])
@@ -34,7 +34,7 @@ def get_episodes(channel, program):
     return db_list
 
 
-def save_episodes(channel, program, episode_list):
+def save_episodes(program, episode_list):
     filename = 'db/%s_programs/%s.txt' % (program['channel'], program['id'])
     with open(filename, 'w') as outfile:
         json.dump(episode_list, outfile)

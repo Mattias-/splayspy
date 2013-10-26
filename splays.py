@@ -28,7 +28,7 @@ def main():
     log.info("Channels: %s" % channels)
     for c in channels:
         pl = c.getPrograms()
-        #c.updateProgramEpisodes(pl)
+        c.getEpisodes(pl[:2])
 
 if __name__ == '__main__':
     main()
